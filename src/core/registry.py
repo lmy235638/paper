@@ -38,8 +38,7 @@ class EnvRegistry:
     def register_object(self, obj: Any, obj_id: str, obj_type: str) -> bool:
         """注册对象到注册表"""
         if obj_type not in self._objects_by_type:
-            raise ValueError(f"Unknown object type: {obj_type}")
-            # self._objects_by_type[obj_type] = {}
+            self._objects_by_type[obj_type] = {}
 
         if obj_id in self._objects_by_type[obj_type]:
             return False
@@ -56,10 +55,6 @@ class EnvRegistry:
             del self._objects_by_type[obj_type][obj_id]
             return True
         return False
-    
-    def remove_object(self, obj_id: str, obj_type: str) -> bool:
-        """从注册表中移除对象（unregister_object的别名）"""
-        return self.unregister_object(obj_id, obj_type)
 
     def get_object(self, obj_id: str, obj_type: str) -> Optional[Any]:
         """根据ID和类型获取对象"""

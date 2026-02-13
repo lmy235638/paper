@@ -50,7 +50,9 @@ class TaskAllocator:
                         track.assign_task(task)
                         # 更新TrackTask状态为assigned
                         task.status = 'assigned'
-                        print(f"  将TrackTask {task.pono}_{task.type} 分配到轨道 {track_id}, 车辆 {task.vehicle_id}")
+                        # 格式化任务编号，包含工位信息
+                        task_name = f"{task.pono}_{task.start_station}_to_{task.end_station}"
+                        print(f"  将TrackTask {task_name} 分配到轨道 {track_id}, 车辆 {task.vehicle_id}")
                     
                     allocated_tasks[track_id] = tasks
             

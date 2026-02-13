@@ -93,25 +93,20 @@ class TaskDispatcher:
                     goods_id=f"goods_{task.pono}",
                     start_ld=task.start_ld,
                     end_cc=task.end_cc,
-                    refine_process=task.refine_process,
-                    current_station=task.start_ld
+                    refine_process=task.refine_process
                 )
                 
                 # 注册货物到环境注册表
                 self.registry.register_object(goods, goods.goods_id, "goods")
                 
                 # 将货物添加到起始工位的goods_list中
-                # 获取所有工位
-                workstations = self.registry.get_objects_by_type("workstation")
-                for workstation in workstations:
-                    if workstation.station_id == task.start_ld:
-                        # 添加货物到工位，使用LDStation的add_goods方法（如果是LD工位）
-                        if hasattr(workstation, 'add_goods'):
-                            workstation.add_goods(goods)
-                        else:
-                            workstation.goods_list.append(goods)
-                            print(f"  货物 {goods} 已添加到起始工位 {workstation.station_id}")
-                        break
+                # 直接根据工位ID获取工位对象
+                workstation = self.registry.get_workstation_by_id(task.start_ld)
+                if workstation:
+                    # 调用工位的add_goods方法添加货物，传递当前时间
+                    workstation.add_goods(goods, current_time)
+                else:
+                    raise ValueError(f"未找到起始工位 {task.start_ld}，货物 {goods} 未添加")
             else:
                 # 任务未到达下发时间，保留在未下发列表
                 remaining.append(task)

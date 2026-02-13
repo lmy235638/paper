@@ -34,8 +34,10 @@ class VehicleType(Enum):
 @unique
 class VehicleStatus(Enum):
     IDLE = 0
-    WORKING = 1
-    WAITING = 2
+    MOVING = 1
+    LOADING = 2
+    UNLOADING = 3
+    WAITING = 4
 
 
 # 工位类型

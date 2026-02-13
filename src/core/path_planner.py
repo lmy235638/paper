@@ -1,4 +1,3 @@
-from datetime import timedelta, datetime
 from typing import List, Dict, Optional
 from src.entities.track_task import TrackTask
 from src.entities.subtask import Subtask
@@ -183,7 +182,7 @@ class PathPlanner:
                     
                     # 生成TrackTask对象，使用正确的字段和默认值
                     track_task = TrackTask(
-                        pono=str(subtask.pono),  # 转换为字符串类型
+                        pono=subtask.pono,
                         type=subtask.type,  # 使用子任务类型
                         start_time=start_time_float,
                         end_time=end_time_float,
@@ -191,10 +190,13 @@ class PathPlanner:
                         end_station=path_segment['end'],
                         track_id=path_segment['track'],
                         vehicle_id=path_segment['vehicle'],  # 当前车辆ID
-                        last_vehicle_id="",  # 默认空字符串
                         status="pending",  # 默认状态为pending
                         process_time=subtask.process_time  # 传递加工时间
                     )
+                    
+                    # 将TrackTask添加到对应的Subtask的track_tasks列表中
+                    subtask.track_tasks.append(track_task)
+                    
                     track_tasks.append(track_task)
                     # 注册到注册表
                     self.registry.register_object(track_task, f"track_task_{subtask.pono}_{track_task.track_id}", 'track_task')
@@ -287,52 +289,82 @@ class PathPlanner:
             path.reverse()
             
             # 生成路径段
-            for i in range(len(path)):
-                current_node_name = path[i]
+            if len(path) == 1:
+                # 只有一个节点的情况：直接从起始工位到结束工位
+                current_node_name = path[0]
                 current_vehicle = self.registry.get_object(current_node_name, 'vehicle')
                 
-                if i == 0:
-                    # 第一个节点：从起始工位到与下一个节点的共同工位
-                    next_node_name = path[i + 1]
-                    next_vehicle = self.registry.get_object(next_node_name, 'vehicle')
-                    common_station = self._get_common_reachable_stations(current_vehicle, next_vehicle)
+                # 通过registry获取track对象
+                track = self.registry.get_object(current_vehicle.track_id, 'track')
+                if track:
+                    # 检查车辆是否能直接到达起始和结束工位
+                    start_station_obj = track.get_station_by_id(start_station)
+                    end_station_obj = track.get_station_by_id(end_station)
                     
-                    solution.append({
-                        'start': start_station,
-                        'end': common_station,
-                        'track': current_vehicle.track_id,
-                        'vehicle': current_vehicle.vehicle_id
-                    })
-                elif i == len(path) - 1:
-                    # 最后一个节点：从与前一个节点的共同工位到结束工位
-                    prev_node_name = path[i - 1]
-                    prev_vehicle = self.registry.get_object(prev_node_name, 'vehicle')
-                    common_station = self._get_common_reachable_stations(prev_vehicle, current_vehicle)
-                    
-                    solution.append({
-                        'start': common_station,
-                        'end': end_station,
-                        'track': current_vehicle.track_id,
-                        'vehicle': current_vehicle.vehicle_id
-                    })
+                    if start_station_obj and end_station_obj:
+                        solution.append({
+                            'start': start_station,
+                            'end': end_station,
+                            'track': current_vehicle.track_id,
+                            'vehicle': current_vehicle.vehicle_id
+                        })
+                    else:
+                        # 车辆无法直接到达两个工位，返回空列表
+                        print(f"⚠️  车辆 {current_vehicle.vehicle_id} 无法直接从 {start_station} 到达 {end_station}，跳过本轮规划")
+                        return []
                 else:
-                    # 中间节点：从与前一个节点的共同工位到与下一个节点的共同工位
-                    prev_node_name = path[i - 1]
-                    next_node_name = path[i + 1]
-                    prev_vehicle = self.registry.get_object(prev_node_name, 'vehicle')
-                    next_vehicle = self.registry.get_object(next_node_name, 'vehicle')
+                    # 无法获取轨道对象，返回空列表
+                    print(f"⚠️  无法获取轨道 {current_vehicle.track_id}，跳过本轮规划")
+                    return []
+            else:
+                # 多个节点的情况
+                for i in range(len(path)):
+                    current_node_name = path[i]
+                    current_vehicle = self.registry.get_object(current_node_name, 'vehicle')
                     
-                    prev_common_station = self._get_common_reachable_stations(prev_vehicle, current_vehicle)
-                    next_common_station = self._get_common_reachable_stations(current_vehicle, next_vehicle)
-                    
-                    solution.append({
-                        'start': prev_common_station,
-                        'end': next_common_station,
-                        'track': current_vehicle.track_id,
-                        'vehicle': current_vehicle.vehicle_id
-                    })
+                    if i == 0:
+                        # 第一个节点：从起始工位到与下一个节点的共同工位
+                        next_node_name = path[i + 1]
+                        next_vehicle = self.registry.get_object(next_node_name, 'vehicle')
+                        common_station = self._get_common_reachable_stations(current_vehicle, next_vehicle)
+                        
+                        solution.append({
+                            'start': start_station,
+                            'end': common_station,
+                            'track': current_vehicle.track_id,
+                            'vehicle': current_vehicle.vehicle_id
+                        })
+                    elif i == len(path) - 1:
+                        # 最后一个节点：从与前一个节点的共同工位到结束工位
+                        prev_node_name = path[i - 1]
+                        prev_vehicle = self.registry.get_object(prev_node_name, 'vehicle')
+                        common_station = self._get_common_reachable_stations(prev_vehicle, current_vehicle)
+                        
+                        solution.append({
+                            'start': common_station,
+                            'end': end_station,
+                            'track': current_vehicle.track_id,
+                            'vehicle': current_vehicle.vehicle_id
+                        })
+                    else:
+                        # 中间节点：从与前一个节点的共同工位到与下一个节点的共同工位
+                        prev_node_name = path[i - 1]
+                        next_node_name = path[i + 1]
+                        prev_vehicle = self.registry.get_object(prev_node_name, 'vehicle')
+                        next_vehicle = self.registry.get_object(next_node_name, 'vehicle')
+                        prev_common_station = self._get_common_reachable_stations(prev_vehicle, current_vehicle)
+                        next_common_station = self._get_common_reachable_stations(current_vehicle, next_vehicle)
+                        
+                        solution.append({
+                            'start': prev_common_station,
+                            'end': next_common_station,
+                            'track': current_vehicle.track_id,
+                            'vehicle': current_vehicle.vehicle_id
+                        })
         else:
-            raise ValueError(f"无法找到从 {start_station} 到 {end_station} 的路径")
+            # 无法找到路径，返回空列表
+            print(f"⚠️  无法找到从 {start_station} 到 {end_station} 的路径，跳过本轮规划")
+            return []
         
         return solution
     

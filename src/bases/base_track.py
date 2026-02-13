@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, List, Dict, Optional
+from typing import Tuple, List, Dict, Optional, Any
 import random
+
+from src.config.constants import VehicleStatus, TrackType
 
 
 class Track(ABC):
@@ -17,8 +19,8 @@ class Track(ABC):
         self.vehicles = []
         self.stations = []  # 轨道上的工位
         self.tasks = []  # 轨道上的任务
-        self.pending_tasks = []  # 等待分配的任务
-        self.buffer = []  # 任务缓冲区，用于冲突消解时存放原任务
+        self.unassigned_tasks = []  # 等待分配的任务
+        self.suspended_tasks = []  # 任务缓冲区，用于冲突消解时存放原任务
 
         self.registry = registry  # 环境注册表引用，用于访问其他对象
 
@@ -29,17 +31,38 @@ class Track(ABC):
     def add_station(self, station):
         """添加工位到轨道"""
         self.stations.append(station)
-    
+
+    def get_stations(self) -> List:
+        """获取轨道上的所有工位"""
+        return self.stations
+
+    def get_station_by_id(self, station_id: str) -> Optional[Any]:
+        """根据工位ID获取指定的工位
+        
+        Args:
+            station_id: 工位ID
+            
+        Returns:
+            对应的工位对象，如果未找到则返回None
+        """
+        for station in self.stations:
+            if station.station_id == station_id:
+                return station
+        return None
+
     def assign_task(self, task):
         """分配任务到轨道"""
-        self.pending_tasks.append(task)
-        print(f"  轨道 {self.track_id} 已接收任务: {task.pono}_{task.type}")
+        self.unassigned_tasks.append(task)
+        # 格式化任务编号，包含工位信息
+        task_name = f"{task.pono}_{task.start_station}_to_{task.end_station}"
+        print(f"  轨道 {self.track_id} 已接收任务: {task_name}")
 
     def get_idle_vehicles(self) -> List:
         """获取轨道上的空闲车辆"""
-        return [vehicle for vehicle in self.vehicles if vehicle.status == 'idle']
+        # 返回空闲车辆（状态为IDLE）
+        return [vehicle for vehicle in self.vehicles if vehicle.status == VehicleStatus.IDLE]
 
-    def find_closest_vehicle(self, task, idle_vehicles) -> Optional:
+    def find_closest_vehicle(self, task, idle_vehicles) -> Optional[Any]:
         """找到距离任务起点最近的车辆"""
         if not idle_vehicles:
             return None
@@ -61,7 +84,7 @@ class Track(ABC):
         
         for vehicle in idle_vehicles:
             # 根据轨道类型计算距离
-            if self.track_type == 'horizontal':
+            if self.track_type == TrackType.HORIZONTAL:
                 distance = abs(vehicle.current_location[0] - start_station.pos[0])
             else:
                 distance = abs(vehicle.current_location[1] - start_station.pos[1])
@@ -72,7 +95,7 @@ class Track(ABC):
         
         return closest_vehicle
 
-    def select_vehicle(self, task, strategy='naive') -> Optional:
+    def select_vehicle(self, task, strategy='naive') -> Optional[Any]:
         """选择车辆执行任务
         
         Args:
@@ -99,16 +122,17 @@ class Track(ABC):
             # 默认使用朴素选择
             return self.find_closest_vehicle(task, idle_vehicles)
 
-    def assign_task_to_vehicle(self, task, strategy='naive'):
+    def assign_task_to_vehicle(self, task, strategy='naive') -> bool:
         """将任务分配给具体车辆"""
         vehicle = self.select_vehicle(task, strategy)
         if vehicle:
             vehicle.assign_task(task)
             print(f"  轨道 {self.track_id} 将任务 {task.pono}_{task.type} 分配给车辆 {vehicle.vehicle_id}")
-            if task in self.pending_tasks:
-                self.pending_tasks.remove(task)
+            if task in self.unassigned_tasks:
+                self.unassigned_tasks.remove(task)
             return True
-        return False
+        else:
+            return False
 
     def detect_conflicts(self) -> List[Dict]:
         """检测轨道上车辆间的冲突
@@ -116,27 +140,29 @@ class Track(ABC):
         Returns:
             冲突列表，每个冲突包含两个车辆信息
         """
-        conflicts = []
-        # 按位置排序车辆，便于检测相邻车辆冲突
-        sorted_vehicles = sorted(self.vehicles, key=lambda v: v.current_location[0] if self.track_type == 'horizontal' else v.current_location[1])
+        # 车辆数量小于2时，不可能发生冲突，直接返回
+        if len(self.vehicles) < 2:
+            return []
         
-        for i in range(len(sorted_vehicles) - 1):
-            vehicle1 = sorted_vehicles[i]
-            vehicle2 = sorted_vehicles[i + 1]
-            
-            # 计算两车距离
-            if self.track_type == 'horizontal':
-                distance = abs(vehicle1.current_location[0] - vehicle2.current_location[0])
-            else:
-                distance = abs(vehicle1.current_location[1] - vehicle2.current_location[1])
-            
-            # 检测冲突（距离小于安全距离）
-            if distance < self.safety_distance and vehicle1.status == 'moving' and vehicle2.status == 'moving':
-                conflicts.append({
-                    'vehicle1': vehicle1,
-                    'vehicle2': vehicle2,
-                    'distance': distance
-                })
+        conflicts = []
+        
+        # 轨道上最多只有两辆车，直接比较
+        vehicle1 = self.vehicles[0]
+        vehicle2 = self.vehicles[1]
+        
+        # 计算两车距离
+        if self.track_type == TrackType.HORIZONTAL:
+            distance = abs(vehicle1.current_location[0] - vehicle2.current_location[0])
+        else:
+            distance = abs(vehicle1.current_location[1] - vehicle2.current_location[1])
+        
+        # 检测冲突（距离小于安全距离）
+        if distance < self.safety_distance and vehicle1.status == 'moving' and vehicle2.status == 'moving':
+            conflicts.append({
+                'vehicle1': vehicle1,
+                'vehicle2': vehicle2,
+                'distance': distance
+            })
         
         return conflicts
 
@@ -147,9 +173,8 @@ class Track(ABC):
             conflicts: 冲突列表
             current_time: 当前时间
         """
-        # 简化冲突处理，暂时跳过冲突检测
-        # 后续可以根据实际需求实现更复杂的冲突处理逻辑
-        print(f"  轨道 {self.track_id} 检测到 {len(conflicts)} 个冲突，暂时跳过处理")
+        # 冲突处理逻辑待实现
+        pass
 
     def update(self, current_time):
         """更新轨道状态
@@ -158,11 +183,11 @@ class Track(ABC):
             current_time: 当前时间
         """
         # 1. 将待分配任务分配给车辆
-        for task in self.pending_tasks.copy():
+        for task in self.unassigned_tasks.copy():
             if self.assign_task_to_vehicle(task):
                 # 任务分配成功，从待分配列表中移除
-                if task in self.pending_tasks:
-                    self.pending_tasks.remove(task)
+                if task in self.unassigned_tasks:
+                    self.unassigned_tasks.remove(task)
         
         # 2. 检测并解决冲突
         conflicts = self.detect_conflicts()
@@ -170,7 +195,7 @@ class Track(ABC):
             self.resolve_conflicts(conflicts, current_time)
         
         # 3. 恢复缓冲区中的任务
-        if self.buffer and all(vehicle.status == 'idle' for vehicle in self.vehicles):
-            for task in self.buffer:
-                self.pending_tasks.append(task)
-            self.buffer.clear()
+        if self.suspended_tasks and all(vehicle.status == VehicleStatus.IDLE for vehicle in self.vehicles):
+            for task in self.suspended_tasks:
+                self.unassigned_tasks.append(task)
+            self.suspended_tasks.clear()

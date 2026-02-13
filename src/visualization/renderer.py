@@ -3,6 +3,8 @@ import numpy as np
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
+from src.config.constants import TrackType, StationType, VehicleType
+
 
 class RailRenderer:
     """
@@ -131,7 +133,7 @@ class RailRenderer:
             line_width = 5 if self.cell_size >= 20 else int(self.cell_size * 0.25)
             
             # 选择轨道颜色
-            if track.track_type == "horizontal":
+            if track.track_type == TrackType.HORIZONTAL:
                 track_color = self.COLORS['track_horizontal']
             else:
                 track_color = self.COLORS['track_vertical']
@@ -151,7 +153,7 @@ class RailRenderer:
             adj_x = (station.pos[0] + 1) * self.cell_size + self.cell_size // 2
             adj_y = (self.max_grid - station.pos[1] + 1) * self.cell_size + self.cell_size // 2
             
-            if station.station_type == "processing":
+            if station.station_type == StationType.PROCESS:
                 radius = 15 if self.cell_size >= 30 else int(self.cell_size * 0.5)
                 pygame.draw.circle(self.screen, self.COLORS['station_process'], (adj_x, adj_y), radius)
             else:
@@ -177,7 +179,7 @@ class RailRenderer:
             veh_size = int(self.cell_size * 0.8)
             
             # 选择车辆颜色
-            if vehicle.vehicle_type == "crane":
+            if vehicle.vehicle_type == VehicleType.CRANE:
                 veh_color = self.COLORS['vehicle_crane']
             else:  # trolley
                 veh_color = self.COLORS['vehicle_trolley']
@@ -197,7 +199,13 @@ class RailRenderer:
             
             # 绘制车辆状态
             if hasattr(vehicle, 'status'):
-                status_text = self.font.render(vehicle.status, True, self.COLORS['text'])
+                # 处理枚举类型的状态
+                status = vehicle.status
+                if hasattr(status, 'name'):
+                    status_str = status.name.lower()
+                else:
+                    status_str = str(status)
+                status_text = self.font.render(status_str, True, self.COLORS['text'])
                 self.screen.blit(status_text, (adj_x - status_text.get_width() // 2, adj_y + veh_size // 2 + 5))
         
         # -------------------------- 绘制当前时间 --------------------------

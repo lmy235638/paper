@@ -1,9 +1,10 @@
 from datetime import datetime
-from src.config.constants import DEFAULT_START_TIME
+from src.config.constants import DEFAULT_START_TIME, TrackType, StationType, VehicleType
 from src.core.registry import EnvRegistry
 from src.core.task_dispatcher import TaskDispatcher
 from src.core.task_split_buffer import TaskSplitBuffer
 from src.core.task_allocator import TaskAllocator
+from src.core.task_scanner import TaskScanner
 from src.bases.base_track import Track
 from src.bases.base_vehicle import Vehicle
 from src.bases.base_workstation import Workstation
@@ -24,7 +25,6 @@ class Env:
         # 初始化当前时间为默认的基准时间
         self.current_time = DEFAULT_START_TIME
         self.task_dispatcher = None
-        self.task_decomposer = None
         self.path_planner = None
         self.task_allocator = None
         
@@ -52,6 +52,8 @@ class Env:
         self.path_planner = PathPlanner(self.registry)
         # 初始化任务分配器
         self.task_allocator = TaskAllocator(self.registry)
+        # 初始化任务扫描器
+        self.task_scanner = TaskScanner(self.registry)
 
     def step(self) -> None:
         # 获取当前时间
@@ -74,20 +76,23 @@ class Env:
         allocated_tasks = self.task_allocator.allocate_tasks(self.current_time)
 
         # 5. 轨道更新：处理轨道上的任务和冲突
-        print(f"\n=== 轨道更新 ===")
+        # print(f"\n=== 轨道更新 ===")
         for track in self.registry.get_objects_by_type('track'):
             # 更新轨道状态
             track.update(self.current_time)
 
         # 6. 车辆更新：执行任务
-        print(f"\n=== 车辆更新 ===")
+        # print(f"\n=== 车辆更新 ===")
         for vehicle in self.registry.get_objects_by_type('vehicle'):
             vehicle.update(self.current_time)
 
         # 7. 工位更新：处理工位上的加工和货物交接
-        print(f"\n=== 工位更新 ===")
+        # print(f"\n=== 工位更新 ===")
         for workstation in self.registry.get_objects_by_type('workstation'):
             workstation.update(self.current_time)
+
+        # 8. 任务扫描：扫描轨道级子任务完成情况，标记上级任务为阶段完成
+        self.task_scanner.scan(self.current_time)
 
         # 更新时间
         self.registry.update_time()
@@ -103,10 +108,12 @@ class Env:
         # 创建轨道
         for track_config in self.config['tracks']:
             track_id = track_config['id']
-            track_type = track_config['type']
+            track_type_str = track_config['type']
             start_point = tuple(track_config['start_pos'])
             end_point = tuple(track_config['end_pos'])
-            if track_type == "horizontal":
+            # 将字符串转换为枚举值
+            track_type = TrackType.HORIZONTAL if track_type_str == "horizontal" else TrackType.VERTICAL
+            if track_type_str == "horizontal":
                 track = HorizontalTrack(track_id, track_type, start_point, end_point, self.registry)
             else:
                 track = VerticalTrack(track_id, track_type, start_point, end_point, self.registry)
@@ -117,11 +124,13 @@ class Env:
         # 创建车辆
         for vehicle_config in self.config['vehicles']:
             vehicle_id = vehicle_config['id']
-            vehicle_type = vehicle_config['type']
+            vehicle_type_str = vehicle_config['type']
             initial_location = tuple(vehicle_config['init_pos'])
             track_id = vehicle_config['track']
             connect_vehicles = vehicle_config.get('connect_vehicles', [])
-            if vehicle_type == "trolley":
+            # 将字符串转换为枚举值
+            vehicle_type = VehicleType.TROLLEY if vehicle_type_str == "trolley" else VehicleType.CRANE
+            if vehicle_type_str == "trolley":
                 vehicle = Trolley(vehicle_id, vehicle_type, track_id, initial_location, self.registry, connect_vehicles)
             else:
                 vehicle = Crane(vehicle_id, vehicle_type, track_id, initial_location, self.registry, connect_vehicles)
@@ -136,11 +145,17 @@ class Env:
         for station_config in self.config['workstations']:
             station_id = station_config['id']
             pos = tuple(station_config['pos'])
-            station_type = station_config['type']
+            station_type_str = station_config['type']
             connected_tracks = set(station_config.get('connected_tracks', []))
             
+            # 将字符串转换为枚举值
+            if station_type_str == 'interaction':
+                station_type = StationType.INTERACT
+            else:
+                station_type = StationType.PROCESS
+            
             # 根据工位ID创建不同类型的工位实例
-            if station_type == 'interaction':
+            if station_type_str == 'interaction':
                 workstation = InteractionStation(station_id, pos, station_type, connected_tracks, self.registry)
             elif 'LD' in station_id:
                 # 创建LD工位实例

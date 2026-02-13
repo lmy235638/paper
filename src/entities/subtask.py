@@ -17,4 +17,10 @@ class Subtask:
     process_time: int  # 加工时间（分钟）
     dispatched: bool = False  # 是否已下发
     completed: bool = False  # 是否已完成
+    track_tasks: list = None  # 存储所属的 TrackTask
+    
+    def __post_init__(self):
+        """初始化后处理"""
+        if self.track_tasks is None:
+            self.track_tasks = []
 
