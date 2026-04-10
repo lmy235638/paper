@@ -2,9 +2,8 @@ import argparse
 from datetime import timedelta
 from src.core.env import Env
 from src.core.simulator import Simulator
-from src.core.report_generator import generate_report, get_latest_task_end_time, check_all_tasks_completed
+from src.utils.report_generator import generate_report, get_latest_task_end_time, check_all_tasks_completed
 from src.utils.file_utils import load_config, load_tasks
-from src.utils.analyze_results import analyze_simulation_results
 
 
 if __name__ == "__main__":
@@ -65,3 +64,5 @@ if __name__ == "__main__":
     # 关闭仿真器和渲染器
     simulator.close()
     print("仿真结束")
+
+    # python main.py --no-render

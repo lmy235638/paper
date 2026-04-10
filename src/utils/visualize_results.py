@@ -67,7 +67,7 @@ def plot_processing_time_errors(report: Dict[str, Any], output_dir='results'):
     
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.savefig(f'{output_dir}/processing_time_errors.png')
-    plt.show()
+    plt.close()  # 关闭当前图形，释放内存
 
 
 def plot_arrival_time_errors(report: Dict[str, Any], output_dir='results'):
@@ -124,7 +124,7 @@ def plot_arrival_time_errors(report: Dict[str, Any], output_dir='results'):
     
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.savefig(f'{output_dir}/arrival_time_errors.png')
-    plt.show()
+    plt.close()  # 关闭当前图形，释放内存
 
 
 def plot_summary_statistics(report: Dict[str, Any], output_dir='results'):
@@ -168,7 +168,7 @@ def plot_summary_statistics(report: Dict[str, Any], output_dir='results'):
     
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.savefig(f'{output_dir}/summary_statistics.png')
-    plt.show()
+    plt.close()  # 关闭当前图形，释放内存
 
 
 def plot_station_level_analysis(report: Dict[str, Any], output_dir='results'):
@@ -230,7 +230,7 @@ def plot_station_level_analysis(report: Dict[str, Any], output_dir='results'):
         
         plt.tight_layout()
         plt.savefig(f'{output_dir}/station_processing_errors.png')
-        plt.show()
+        plt.close()  # 关闭当前图形，释放内存
     
     # 创建到达时间误差图表
     if station_arrival_errors:
@@ -256,7 +256,7 @@ def plot_station_level_analysis(report: Dict[str, Any], output_dir='results'):
         
         plt.tight_layout()
         plt.savefig(f'{output_dir}/station_arrival_errors.png')
-        plt.show()
+        plt.close()  # 关闭当前图形，释放内存
 
 
 def visualize_results(filename: str, output_dir='results'):

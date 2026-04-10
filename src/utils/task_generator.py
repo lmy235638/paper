@@ -256,6 +256,8 @@ class TaskGenerator:
         
         # 2. 任务开始时间计算，使用上一个任务开始时间计算间隔
         task_start = self._calculate_task_start_time(pono, start_ld, first_task_start, last_task_start)
+        # 更新该 LD 炉的最后使用时间
+        self.ld_bookings[start_ld] = task_start
         
         # 3. 预计算精炼时长
         lf_duration, rh_duration = self._calculate_process_durations(refine_process)
