@@ -289,7 +289,7 @@ class RailRenderer:
         
         # 绘制控制说明
         control_title = self.font.render("控制说明", True, self.COLORS['text'])
-        self.screen.blit(control_title, (right_panel_x + 20, 450))
+        self.screen.blit(control_title, (right_panel_x + 20, 480))
         
         control_lines = [
             "空格键: 暂停/继续",
@@ -300,7 +300,7 @@ class RailRenderer:
         
         for i, line in enumerate(control_lines):
             control_text = self.font.render(line, True, self.COLORS['text'])
-            self.screen.blit(control_text, (right_panel_x + 20, 480 + i * 25))
+            self.screen.blit(control_text, (right_panel_x + 20, 520 + i * 25))
     
     def check_for_exit(self) -> bool:
         """

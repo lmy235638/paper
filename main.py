@@ -58,6 +58,9 @@ if __name__ == "__main__":
             print("\n仿真超时，超过最晚任务时间2小时，仿真结束")
             running = False
     
+    # 保存车辆历史数据
+    env.save_vehicle_history()
+    
     # 生成报告
     generate_report(env)
     

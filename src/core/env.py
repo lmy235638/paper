@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from src.config.constants import DEFAULT_START_TIME, TrackType, StationType, VehicleType
 from src.core.registry import EnvRegistry
@@ -37,12 +38,18 @@ class Env:
         self.registry.set_env(self)
         self.registry.set_time(self.current_time)
 
+        # 初始化车辆历史数据存储
+        self.vehicle_history = {}
+
         self._create_objects()
 
     def reset(self) -> None:
         """重置环境状态"""
         self.current_time = DEFAULT_START_TIME
         self.registry.set_time(self.current_time)
+        
+        # 初始化车辆历史数据存储
+        self.vehicle_history = {}
         
         # 初始化任务下发器，并传递外部任务和注册表
         self.task_dispatcher = TaskDispatcher(self.tasks, self.registry)
@@ -93,6 +100,20 @@ class Env:
 
         # 8. 任务扫描：扫描轨道级子任务完成情况，标记上级任务为阶段完成
         self.task_scanner.scan(self.current_time)
+
+        # 9. 记录车辆状态数据
+        time_str = self.current_time.strftime('%Y-%m-%d %H:%M:%S')
+        self.vehicle_history[time_str] = []
+        
+        for vehicle in self.registry.get_objects_by_type('vehicle'):
+            vehicle_data = {
+                'vehicle_id': vehicle.vehicle_id,
+                'location': vehicle.current_location,
+                'has_goods': bool(vehicle.goods),
+                'status': vehicle.status.value if hasattr(vehicle.status, 'value') else str(vehicle.status),
+                'track_id': vehicle.track_id
+            }
+            self.vehicle_history[time_str].append(vehicle_data)
 
         # 更新时间
         self.registry.update_time()
@@ -172,5 +193,22 @@ class Env:
             # 添加工位进轨道
             for connected_track in connected_tracks:
                 self.registry.get_track_by_id(connected_track).add_station(workstation)
+
+    def save_vehicle_history(self, file_path='data/vehicle_history.json'):
+        """将车辆历史数据保存为JSON文件
+        
+        Args:
+            file_path: 保存文件的路径，默认为data/vehicle_history.json
+        """
+        import os
+        
+        # 确保目录存在
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+        # 保存数据到JSON文件
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(self.vehicle_history, f, ensure_ascii=False, indent=2)
+        
+        print(f"车辆历史数据已保存到: {file_path}")
 
 
